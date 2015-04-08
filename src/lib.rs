@@ -14,6 +14,10 @@ use core::fmt;
 
 pub mod macros;
 
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
 #[cfg(target_arch="x86_64")]
 #[macro_use]
 extern crate x86;
