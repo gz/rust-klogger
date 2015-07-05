@@ -1,5 +1,7 @@
 #![feature(no_std)]
 #![feature(core)]
+#![feature(core_prelude)]
+#![feature(core_str_ext)]
 #![no_std]
 
 #![crate_name = "klogger"]
