@@ -1,16 +1,10 @@
 #![feature(no_std)]
-#![feature(core)]
-#![feature(core_prelude)]
 #![feature(core_str_ext)]
 #![no_std]
 
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
 
-#[macro_use]
-extern crate core;
-
-use core::prelude::*;
 use core::atomic;
 use core::fmt;
 

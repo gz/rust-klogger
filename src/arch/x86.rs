@@ -1,4 +1,3 @@
-use core::prelude::*;
 use x86::io;
 
 /// Write a string to the output channel.
