@@ -5,14 +5,8 @@
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
 
-use core::atomic;
 use core::fmt;
-
 pub mod macros;
-
-#[cfg(test)]
-#[macro_use]
-extern crate std;
 
 #[cfg(target_arch="x86_64")]
 #[macro_use]
@@ -45,7 +39,9 @@ impl ::core::ops::Drop for Writer {
 impl fmt::Write for Writer {
     /// Write stuff to serial out.
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        unsafe { arch::puts(s); }
+        unsafe {
+            arch::puts(s);
+        }
         Ok(())
     }
 }
