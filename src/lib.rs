@@ -20,10 +20,16 @@ pub struct Writer;
 
 impl Writer {
     /// Obtain a logger for the specified module.
-    pub fn get(module: &str) -> Writer {
+    pub fn get_module(module: &str) -> Writer {
         use core::fmt::Write;
         let mut ret = Writer;
         write!(&mut ret, "[{}] ", module);
+        ret
+    }
+
+    pub fn get() -> Writer {
+        use core::fmt::Write;
+        let mut ret = Writer;
         ret
     }
 }
