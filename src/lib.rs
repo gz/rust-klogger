@@ -1,19 +1,15 @@
-#![feature(no_std)]
-#![feature(core_str_ext)]
 #![no_std]
-
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
 
 use core::fmt;
 pub mod macros;
 
-#[cfg(target_arch="x86_64")]
-#[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate x86;
 
-#[cfg(target_arch="x86_64")]
-#[path="arch/x86.rs"]
+#[cfg(target_arch = "x86_64")]
+#[path = "arch/x86.rs"]
 mod arch;
 
 pub struct Writer;
@@ -23,14 +19,12 @@ impl Writer {
     pub fn get_module(module: &str) -> Writer {
         use core::fmt::Write;
         let mut ret = Writer;
-        write!(&mut ret, "[{}] ", module);
+        write!(&mut ret, "[{}] ", module).expect("Writer");
         ret
     }
 
     pub fn get() -> Writer {
-        use core::fmt::Write;
-        let mut ret = Writer;
-        ret
+        Writer
     }
 }
 
@@ -38,7 +32,7 @@ impl ::core::ops::Drop for Writer {
     /// Release the logger.
     fn drop(&mut self) {
         use core::fmt::Write;
-        write!(self, "\n");
+        write!(self, "\n").expect("Newline");
     }
 }
 
