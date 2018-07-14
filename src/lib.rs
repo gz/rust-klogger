@@ -1,6 +1,7 @@
 #![no_std]
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
+#![deny(warnings)]
 
 use core::fmt;
 pub mod macros;
