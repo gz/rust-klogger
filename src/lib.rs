@@ -45,3 +45,21 @@ impl fmt::Write for Writer {
         Ok(())
     }
 }
+
+pub struct WriterNoDrop;
+
+impl WriterNoDrop {
+    pub fn get() -> WriterNoDrop {
+        WriterNoDrop
+    }
+}
+
+impl fmt::Write for WriterNoDrop {
+    /// Write stuff to serial out.
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        unsafe {
+            arch::puts(s);
+        }
+        Ok(())
+    }
+}

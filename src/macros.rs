@@ -17,3 +17,12 @@ macro_rules! sprintln {
 		let _ = write!(&mut Writer::get(), $($arg)*);
 	})
 }
+
+#[macro_export]
+macro_rules! sprint {
+	( $($arg:tt)* ) => ({
+		use core::fmt::Write;
+        use klogger::{WriterNoDrop};
+		let _ = write!(&mut WriterNoDrop::get(), $($arg)*);
+	})
+}
