@@ -1,4 +1,4 @@
-use x86::shared::io;
+use x86::io;
 
 /// Write a string to the output channel.
 pub unsafe fn puts(s: &str) {

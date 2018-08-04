@@ -1,14 +1,16 @@
 [package]
 name = "klogger"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>"]
 
 description = "Library for logging in kernel mode."
-repository = "https://github.com/gz/rust-oslogger"
+repository = "https://github.com/gz/rust-klogger"
 
 readme = "README.md"
 keywords = ["serial", "os", "amd64", "x86"]
 license = "MIT"
 
 [dependencies]
-x86 = "0.9"
+x86 = "0.10"
+log = "0.4"
+termcodes = "0.0.1"
