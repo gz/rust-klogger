@@ -1,6 +1,7 @@
 #![no_std]
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
+#![feature(use_extern_macros)]
 
 use core::fmt;
 
@@ -12,6 +13,7 @@ extern crate termcodes;
 
 #[cfg(target_arch = "x86_64")]
 extern crate x86;
+use x86::cpuid::cpuid;
 
 #[cfg(target_arch = "x86_64")]
 #[path = "arch/x86.rs"]
@@ -20,7 +22,13 @@ mod arch;
 use log::{Level, Metadata, Record, SetLoggerError};
 use termcodes::color;
 
-static mut LOGGER: KLogger = KLogger { start_tsc: 0 };
+static mut LOGGER: KLogger = KLogger {
+    has_tsc: false,
+    has_invariant_tsc: false,
+
+    tsc_start: 0,
+    tsc_frequency: 1,
+};
 
 pub struct Writer;
 
@@ -74,8 +82,26 @@ impl fmt::Write for WriterNoDrop {
     }
 }
 
+#[derive(Debug)]
 struct KLogger {
-    start_tsc: u64,
+    has_tsc: bool,
+    has_invariant_tsc: bool,
+    tsc_start: u64,
+    /// Frequency in Hz
+    tsc_frequency: u64,
+}
+
+impl KLogger {
+    /// Time in nano seconds since KLogger init.
+    fn elapsed_ns(&self) -> u64 {
+        if self.has_tsc {
+            let cur = unsafe { x86::time::rdtsc() };
+            let elapsed = cur - self.tsc_start;
+            elapsed / core::cmp::max(1, self.tsc_frequency / 1_000_000_000)
+        } else {
+            0
+        }
+    }
 }
 
 impl log::Log for KLogger {
@@ -85,8 +111,6 @@ impl log::Log for KLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            let cur = unsafe { x86::time::rdtsc() };
-
             let color = match record.level() {
                 Level::Error => color::AnsiValue(202),
                 Level::Warn => color::AnsiValue(167),
@@ -98,7 +122,7 @@ impl log::Log for KLogger {
             sprintln!(
                 "{}{:>10}{} [{}{:5}{}] - {}: {}{}{}",
                 color::Fg(color::LightYellow),
-                cur - self.start_tsc,
+                self.elapsed_ns(),
                 color::Fg(color::Reset),
                 color::Fg(color),
                 record.level(),
@@ -115,8 +139,51 @@ impl log::Log for KLogger {
 }
 
 pub fn init(level: Level) -> Result<(), SetLoggerError> {
+    let cpuid = x86::cpuid::CpuId::new();
+
     unsafe {
-        (&mut LOGGER).start_tsc = x86::time::rdtsc();
+        (&mut LOGGER).has_tsc = cpuid
+            .get_feature_info()
+            .map_or(false, |finfo| finfo.has_tsc());
+        (&mut LOGGER).has_invariant_tsc = cpuid
+            .get_extended_function_info()
+            .map_or(false, |efinfo| efinfo.has_invariant_tsc());
+        if LOGGER.has_tsc {
+            (&mut LOGGER).tsc_start = x86::time::rdtsc();
+        }
+        let hypervisor_base = cpuid!(0x40000000, 0);
+        let is_kvm = hypervisor_base.eax == 0x40000001
+            && hypervisor_base.ebx == 0x4b4d564b
+            && hypervisor_base.ecx == 0x564b4d56
+            && hypervisor_base.edx == 0x4d;
+
+        if cpuid.get_tsc_info().is_some() {
+            // Nominal TSC frequency = ( CPUID.15H.ECX[31:0] * CPUID.15H.EBX[31:0] ) ÷ CPUID.15H.EAX[31:0]
+            (&mut LOGGER).tsc_frequency = cpuid
+                .get_tsc_info()
+                .map_or(1, |tinfo| tinfo.tsc_frequency());
+        } else if cpuid.get_processor_frequency_info().is_some() {
+            (&mut LOGGER).tsc_frequency = cpuid
+                .get_processor_frequency_info()
+                .map_or(2, |pinfo| pinfo.processor_max_frequency() as u64 * 1000000);
+        } else if is_kvm {
+            // vm aware tsc frequency retrieval: https://lwn.net/Articles/301888/
+            // # EAX: (Virtual) TSC frequency in kHz.
+            // # EBX: (Virtual) Bus (local apic timer) frequency in kHz.
+            // # ECX, EDX: RESERVED (Per above, reserved fields are set to zero).
+            let virt_tinfo = cpuid!(0x40000010, 0);
+            (&mut LOGGER).tsc_frequency = virt_tinfo.eax as u64 * 1000;
+        } else {
+            (&mut LOGGER).tsc_frequency = 1;
+        }
+
+        // Another way that segfaults in KVM:
+        // The scalable bus frequency is encoded in the bit field MSR_PLATFORM_INFO[15:8]
+        // and the nominal TSC frequency can be determined by multiplying this number
+        // by a bus speed of 100 MHz.
+        //(&mut LOGGER).tsc_frequency =
+        //    ((x86::msr::rdmsr(x86::msr::MSR_PLATFORM_INFO) >> 8) & 0xff) * 1000000;
+
         log::set_logger(&LOGGER).map(|()| log::set_max_level(level.to_level_filter()))
     }
 }
