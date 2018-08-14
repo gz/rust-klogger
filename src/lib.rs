@@ -1,7 +1,6 @@
 #![no_std]
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
-#![feature(use_extern_macros)]
 
 use core::fmt;
 
@@ -11,9 +10,11 @@ pub mod macros;
 extern crate log;
 extern crate termcodes;
 
+#[macro_use]
+extern crate raw_cpuid;
+
 #[cfg(target_arch = "x86_64")]
 extern crate x86;
-use x86::cpuid::cpuid;
 
 #[cfg(target_arch = "x86_64")]
 #[path = "arch/x86.rs"]
@@ -139,7 +140,7 @@ impl log::Log for KLogger {
 }
 
 pub fn init(level: Level) -> Result<(), SetLoggerError> {
-    let cpuid = x86::cpuid::CpuId::new();
+    let cpuid = raw_cpuid::CpuId::new();
 
     unsafe {
         (&mut LOGGER).has_tsc = cpuid
