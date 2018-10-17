@@ -28,7 +28,7 @@ static mut LOGGER: KLogger = KLogger {
     has_invariant_tsc: false,
 
     tsc_start: 0,
-    tsc_frequency: 1,
+    tsc_frequency: 2_000_000_000,
 };
 
 pub struct Writer;
@@ -97,8 +97,8 @@ impl KLogger {
     fn elapsed_ns(&self) -> u64 {
         if self.has_tsc {
             let cur = unsafe { x86::time::rdtsc() };
-            let elapsed = cur - self.tsc_start;
-            elapsed / core::cmp::max(1, self.tsc_frequency / 1_000_000_000)
+            let elapsed = (cur - self.tsc_start) as f64;
+            (elapsed / (self.tsc_frequency as f64 / 1_000_000_000.0)) as u64
         } else {
             0
         }
@@ -153,7 +153,7 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
             (&mut LOGGER).tsc_start = x86::time::rdtsc();
         }
         let hypervisor_base = cpuid!(0x40000000, 0);
-        let is_kvm = hypervisor_base.eax == 0x40000001
+        let is_kvm = hypervisor_base.eax == 0x40000010
             && hypervisor_base.ebx == 0x4b4d564b
             && hypervisor_base.ecx == 0x564b4d56
             && hypervisor_base.edx == 0x4d;
@@ -162,11 +162,13 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
             // Nominal TSC frequency = ( CPUID.15H.ECX[31:0] * CPUID.15H.EBX[31:0] ) ÷ CPUID.15H.EAX[31:0]
             (&mut LOGGER).tsc_frequency = cpuid
                 .get_tsc_info()
-                .map_or(1, |tinfo| tinfo.tsc_frequency());
+                .map_or(2_000_000_000, |tinfo| tinfo.tsc_frequency());
         } else if cpuid.get_processor_frequency_info().is_some() {
             (&mut LOGGER).tsc_frequency = cpuid
                 .get_processor_frequency_info()
-                .map_or(2, |pinfo| pinfo.processor_max_frequency() as u64 * 1000000);
+                .map_or(2_000_000_000, |pinfo| {
+                    pinfo.processor_max_frequency() as u64 * 1000000
+                });
         } else if is_kvm {
             // vm aware tsc frequency retrieval: https://lwn.net/Articles/301888/
             // # EAX: (Virtual) TSC frequency in kHz.
@@ -175,7 +177,7 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
             let virt_tinfo = cpuid!(0x40000010, 0);
             (&mut LOGGER).tsc_frequency = virt_tinfo.eax as u64 * 1000;
         } else {
-            (&mut LOGGER).tsc_frequency = 1;
+            (&mut LOGGER).tsc_frequency = 2_000_000_000;
         }
 
         // Another way that segfaults in KVM:
