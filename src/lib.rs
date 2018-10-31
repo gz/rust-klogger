@@ -4,14 +4,11 @@
 
 #[cfg(not(target_family = "unix"))]
 mod std {
-    use core::fmt;
-    use core::ops;
+    pub use core::fmt;
+    pub use core::ops;
 }
 
-#[cfg(target_family = "unix")]
 use std::fmt;
-
-#[cfg(target_family = "unix")]
 use std::ops;
 
 #[macro_use]
