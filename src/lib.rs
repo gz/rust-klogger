@@ -1,8 +1,18 @@
-#![no_std]
+#![cfg_attr(not(target_family = "unix"), no_std)]
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
 
-use core::fmt;
+#[cfg(not(target_family = "unix"))]
+mod std {
+    use core::fmt;
+    use core::ops;
+}
+
+#[cfg(target_family = "unix")]
+use std::fmt;
+
+#[cfg(target_family = "unix")]
+use std::ops;
 
 #[macro_use]
 pub mod macros;
@@ -16,8 +26,12 @@ extern crate raw_cpuid;
 #[cfg(target_arch = "x86_64")]
 extern crate x86;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_os = "none"))]
 #[path = "arch/x86.rs"]
+mod arch;
+
+#[cfg(target_family = "unix")]
+#[path = "arch/unix.rs"]
 mod arch;
 
 use log::{Level, Metadata, Record, SetLoggerError};
@@ -36,7 +50,7 @@ pub struct Writer;
 impl Writer {
     /// Obtain a logger for the specified module.
     pub fn get_module(module: &str) -> Writer {
-        use core::fmt::Write;
+        use std::fmt::Write;
         let mut ret = Writer;
         write!(&mut ret, "[{}] ", module).expect("Writer");
         ret
@@ -47,10 +61,10 @@ impl Writer {
     }
 }
 
-impl ::core::ops::Drop for Writer {
+impl ops::Drop for Writer {
     /// Release the logger.
     fn drop(&mut self) {
-        use core::fmt::Write;
+        use std::fmt::Write;
         write!(self, "\n").expect("Newline");
     }
 }
