@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! sprintln {
 	( $($arg:tt)* ) => ({
-		use std::fmt::Write;
+		use core::fmt::Write;
         use $crate::{Writer};
 		let _ = write!(&mut Writer::get(), $($arg)*);
 	})

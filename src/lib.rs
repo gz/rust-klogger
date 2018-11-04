@@ -2,14 +2,11 @@
 #![crate_name = "klogger"]
 #![crate_type = "lib"]
 
-#[cfg(not(target_family = "unix"))]
-mod std {
-    pub use core::fmt;
-    pub use core::ops;
-}
+#[cfg(not(target_os = "none"))]
+extern crate core;
 
-use std::fmt;
-use std::ops;
+use core::fmt;
+use core::ops;
 
 #[macro_use]
 pub mod macros;
@@ -47,7 +44,7 @@ pub struct Writer;
 impl Writer {
     /// Obtain a logger for the specified module.
     pub fn get_module(module: &str) -> Writer {
-        use std::fmt::Write;
+        use core::fmt::Write;
         let mut ret = Writer;
         write!(&mut ret, "[{}] ", module).expect("Writer");
         ret
@@ -61,7 +58,7 @@ impl Writer {
 impl ops::Drop for Writer {
     /// Release the logger.
     fn drop(&mut self) {
-        use std::fmt::Write;
+        use core::fmt::Write;
         write!(self, "\n").expect("Newline");
     }
 }
