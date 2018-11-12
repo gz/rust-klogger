@@ -2,3 +2,7 @@
 pub unsafe fn puts(s: &str) {
     print!("{}", s);
 }
+
+pub unsafe fn putc(c: char) {
+    print!("{}", c);
+}

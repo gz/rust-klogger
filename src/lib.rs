@@ -198,3 +198,9 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
         log::set_logger(&LOGGER).map(|()| log::set_max_level(level.to_level_filter()))
     }
 }
+
+pub fn putchar(c: char) {
+    unsafe {
+        arch::putc(c);
+    }
+}

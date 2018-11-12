@@ -8,8 +8,12 @@ pub unsafe fn puts(s: &str) {
     }
 }
 
+pub unsafe fn putc(c: char) {
+    putb(0x3f8, c as u8);
+}
+
 /// Write a single byte to the output channel.
-pub unsafe fn putb(port: u16, b: u8) {
+unsafe fn putb(port: u16, b: u8) {
     // Wait for the serial FIFO to be ready
     while (io::inb(port + 5) & 0x20) == 0 {}
     io::outb(port, b);
