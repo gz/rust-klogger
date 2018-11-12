@@ -14,9 +14,6 @@ pub mod macros;
 extern crate log;
 extern crate termcodes;
 
-#[macro_use]
-extern crate raw_cpuid;
-
 #[cfg(target_arch = "x86_64")]
 extern crate x86;
 
@@ -148,7 +145,7 @@ impl log::Log for KLogger {
 }
 
 pub fn init(level: Level) -> Result<(), SetLoggerError> {
-    let cpuid = raw_cpuid::CpuId::new();
+    let cpuid = x86::cpuid::CpuId::new();
 
     unsafe {
         (&mut LOGGER).has_tsc = cpuid
@@ -160,11 +157,6 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
         if LOGGER.has_tsc {
             (&mut LOGGER).tsc_start = x86::time::rdtsc();
         }
-        let hypervisor_base = cpuid!(0x40000000, 0);
-        let is_kvm = hypervisor_base.eax == 0x40000010
-            && hypervisor_base.ebx == 0x4b4d564b
-            && hypervisor_base.ecx == 0x564b4d56
-            && hypervisor_base.edx == 0x4d;
 
         if cpuid.get_tsc_info().is_some() {
             // Nominal TSC frequency = ( CPUID.15H.ECX[31:0] * CPUID.15H.EBX[31:0] ) ÷ CPUID.15H.EAX[31:0]
@@ -177,13 +169,10 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
                 .map_or(2_000_000_000, |pinfo| {
                     pinfo.processor_max_frequency() as u64 * 1000000
                 });
-        } else if is_kvm {
-            // vm aware tsc frequency retrieval: https://lwn.net/Articles/301888/
-            // # EAX: (Virtual) TSC frequency in kHz.
-            // # EBX: (Virtual) Bus (local apic timer) frequency in kHz.
-            // # ECX, EDX: RESERVED (Per above, reserved fields are set to zero).
-            let virt_tinfo = cpuid!(0x40000010, 0);
-            (&mut LOGGER).tsc_frequency = virt_tinfo.eax as u64 * 1000;
+        } else if cpuid.get_hypervisor_info().is_some() {
+            let hv = cpuid.get_hypervisor_info().unwrap();
+            hv.tsc_frequency()
+                .map_or(2_000_000_000, |tsc_khz| tsc_khz as u64 * 1000);
         } else {
             (&mut LOGGER).tsc_frequency = 2_000_000_000;
         }

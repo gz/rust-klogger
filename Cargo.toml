@@ -11,7 +11,6 @@ keywords = ["serial", "os", "amd64", "x86"]
 license = "MIT"
 
 [dependencies]
-x86 = "0.10"
+x86 = "0.13"
 log = "0.4"
 termcodes = "0.0.1"
-raw-cpuid = { git = "https://github.com/gz/rust-cpuid.git" }
