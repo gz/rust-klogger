@@ -171,7 +171,8 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
                 });
         } else if cpuid.get_hypervisor_info().is_some() {
             let hv = cpuid.get_hypervisor_info().unwrap();
-            hv.tsc_frequency()
+            (&mut LOGGER).tsc_frequency = hv
+                .tsc_frequency()
                 .map_or(2_000_000_000, |tsc_khz| tsc_khz as u64 * 1000);
         } else {
             (&mut LOGGER).tsc_frequency = 2_000_000_000;
