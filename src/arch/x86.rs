@@ -5,11 +5,14 @@ pub unsafe fn puts(s: &str) {
     for b in s.bytes() {
         // TODO: hard-coded serial line 0.
         putb(0x3f8, b);
+        // TODO: hard-coded serial line 1.
+        putb(0x2f8, b);
     }
 }
 
 pub unsafe fn putc(c: char) {
     putb(0x3f8, c as u8);
+    putb(0x2f8, c as u8);
 }
 
 /// Write a single byte to the output channel.

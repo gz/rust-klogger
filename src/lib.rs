@@ -56,7 +56,7 @@ impl ops::Drop for Writer {
     /// Release the logger.
     fn drop(&mut self) {
         use core::fmt::Write;
-        write!(self, "\n").expect("Newline");
+        write!(self, "\r\n").expect("Newline");
     }
 }
 
