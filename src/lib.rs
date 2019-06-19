@@ -17,11 +17,11 @@ extern crate termcodes;
 #[cfg(target_arch = "x86_64")]
 extern crate x86;
 
-#[cfg(all(target_arch = "x86_64", target_os = "none"))]
+#[cfg(any(feature = "use_ioports", all(target_arch = "x86_64", target_os = "none")))]
 #[path = "arch/x86.rs"]
 mod arch;
 
-#[cfg(target_family = "unix")]
+#[cfg(all(not(feature = "use_ioports"), target_family = "unix"))]
 #[path = "arch/unix.rs"]
 mod arch;
 
