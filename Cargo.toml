@@ -1,6 +1,6 @@
 [package]
 name = "klogger"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>"]
 
 description = "Library for logging in kernel mode."
@@ -11,9 +11,10 @@ keywords = ["serial", "os", "amd64", "x86"]
 license = "MIT"
 
 [dependencies]
-x86 = "0.19"
+x86 = "0.21"
 log = "0.4"
 termcodes = "0.0.1"
+spin = "0.5.2"
 
 [features]
 use_ioports = [] # Always use ioports, even when compiling for a UNIX architecture (used by kvmtests)
