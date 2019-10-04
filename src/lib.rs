@@ -17,7 +17,10 @@ extern crate termcodes;
 #[cfg(target_arch = "x86_64")]
 extern crate x86;
 
-#[cfg(any(feature = "use_ioports", all(target_arch = "x86_64", target_os = "none")))]
+#[cfg(any(
+    feature = "use_ioports",
+    all(target_arch = "x86_64", target_os = "none")
+))]
 #[path = "arch/x86.rs"]
 mod arch;
 
@@ -38,7 +41,7 @@ const KHZ_TO_HZ: u64 = 1000;
 const NS_PER_SEC: u64 = 1_000_000_000u64;
 
 /// Global lock to protect serial line from concurrent printing.
-static mut SERIAL_LINE_MUTEX: spin::Mutex<bool> = spin::Mutex::new(false);
+pub static SERIAL_LINE_MUTEX: spin::Mutex<bool> = spin::Mutex::new(false);
 
 #[derive(Debug)]
 struct KLogger {
@@ -154,7 +157,7 @@ impl<'a> Writer<'a> {
     /// Obtain a logger for the specified module.
     pub fn get_module(module: &str) -> Writer<'a> {
         use core::fmt::Write;
-        let line_lock = unsafe { SERIAL_LINE_MUTEX.lock() };
+        let line_lock = SERIAL_LINE_MUTEX.lock();
         let mut ret = Writer { line_lock };
         write!(&mut ret, "[{}] ", module).expect("Writer");
         ret
@@ -162,7 +165,7 @@ impl<'a> Writer<'a> {
 
     /// Obtain a logger.
     pub fn get() -> Writer<'a> {
-        let line_lock = unsafe { SERIAL_LINE_MUTEX.lock() };
+        let line_lock = SERIAL_LINE_MUTEX.lock();
         Writer { line_lock }
     }
 }
