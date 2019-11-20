@@ -38,7 +38,7 @@ const MHZ_TO_HZ: u64 = 1000 * 1000;
 const KHZ_TO_HZ: u64 = 1000;
 
 /// One sec has that many ns.
-const NS_PER_SEC: u64 = 1_000_000_000u64;
+const _NS_PER_SEC: u64 = 1_000_000_000u64;
 
 /// Global lock to protect serial line from concurrent printing.
 pub static SERIAL_LINE_MUTEX: spin::Mutex<bool> = spin::Mutex::new(false);
@@ -86,11 +86,13 @@ impl KLogger {
 
             if self.has_invariant_tsc && self.tsc_frequency.is_some() {
                 let elapsed_cycles = cur - self.tsc_start;
-                let tsc_frequency_hz = self.tsc_frequency.unwrap_or(1); // This won't fail, checked by if above
+                let _tsc_frequency_hz = self.tsc_frequency.unwrap_or(1); // This won't fail, checked by if above
 
                 // Basic is: let ns = elapsed_cycles / (tsc_frequency / NS_PER_SEC);
                 // But we avoid removing all precision with division:
-                let ns = (elapsed_cycles * NS_PER_SEC) / tsc_frequency_hz;
+                // TODO: fix overflow with * NS_PER_SEC
+                //let ns = (elapsed_cycles * NS_PER_SEC) / tsc_frequency_hz;
+                let ns = elapsed_cycles;
 
                 ElapsedTime::Nanoseconds(ns)
             } else {
