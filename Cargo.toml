@@ -15,6 +15,7 @@ x86 = "0.21"
 log = "0.4"
 termcodes = "0.0.1"
 spin = "0.5.2"
+heapless = "0.5.1"
 
 [features]
 use_ioports = [] # Always use ioports, even when compiling for a UNIX architecture (used by kvmtests)

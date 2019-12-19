@@ -4,6 +4,7 @@
 
 #[cfg(not(target_os = "none"))]
 extern crate core;
+extern crate heapless;
 
 use core::fmt;
 use core::ops;
@@ -28,8 +29,10 @@ mod arch;
 #[path = "arch/unix.rs"]
 mod arch;
 
-use log::{Level, Metadata, Record, SetLoggerError};
-use termcodes::color;
+use heapless::consts::*;
+use heapless::{String, Vec};
+use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
+use termcodes::color; // type level integer used to specify capacity
 
 /// One Mhz is that many Hz.
 const MHZ_TO_HZ: u64 = 1000 * 1000;
@@ -42,6 +45,14 @@ const _NS_PER_SEC: u64 = 1_000_000_000u64;
 
 /// Global lock to protect serial line from concurrent printing.
 pub static SERIAL_LINE_MUTEX: spin::Mutex<bool> = spin::Mutex::new(false);
+
+#[derive(Debug)]
+pub struct Directive {
+    name: Option<String<U16>>,
+    level: LevelFilter,
+}
+
+//unsafe impl ArrayLength<Directive> for Directive;
 
 #[derive(Debug)]
 struct KLogger {
@@ -59,6 +70,10 @@ struct KLogger {
     ///
     /// Sometimes we can't figure this out (yet)
     tsc_frequency: Option<u64>,
+    /// Filter(s) used by Klogger.
+    ///
+    /// Use module name or log level or both for filtering.
+    filter: Vec<Directive, U8>,
 }
 
 enum ElapsedTime {
@@ -104,11 +119,25 @@ impl KLogger {
             ElapsedTime::Undetermined
         }
     }
+
+    /// Returns the maximum `LevelFilter` that this filter instance is
+    /// configured to output.
+    pub fn filter(&self) -> LevelFilter {
+        return self
+            .filter
+            .iter()
+            .map(|d| d.level)
+            .max()
+            .unwrap_or(LevelFilter::Off);
+    }
 }
 
 impl log::Log for KLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Trace
+        let level = metadata.level();
+        let target = metadata.target();
+
+        enabled(&self.filter, level, target)
     }
 
     fn log(&self, record: &Record) {
@@ -145,6 +174,7 @@ static mut LOGGER: KLogger = KLogger {
     has_invariant_tsc: false,
     tsc_start: 0,
     tsc_frequency: None,
+    filter: Vec(heapless::i::Vec::new()),
 };
 
 /// A writer for the serial line. It holds a lock so
@@ -216,7 +246,7 @@ impl fmt::Write for WriterNoDrop {
     }
 }
 
-pub fn init(level: Level) -> Result<(), SetLoggerError> {
+pub fn init(args: &str) -> Result<(), SetLoggerError> {
     let cpuid = x86::cpuid::CpuId::new();
 
     unsafe {
@@ -268,12 +298,316 @@ pub fn init(level: Level) -> Result<(), SetLoggerError> {
         //(&mut LOGGER).tsc_frequency =
         //    ((x86::msr::rdmsr(x86::msr::MSR_PLATFORM_INFO) >> 8) & 0xff) * 1000000;
 
-        log::set_logger(&LOGGER).map(|()| log::set_max_level(level.to_level_filter()))
+        parse_args(&mut LOGGER.filter, args);
+        log::set_logger(&LOGGER).map(|()| log::set_max_level(LOGGER.filter()))
     }
 }
 
 pub fn putchar(c: char) {
     unsafe {
         arch::putc(c);
+    }
+}
+
+/// Most of the filtering code is inspired or copied from
+/// https://github.com/sebasmagri/env_logger/blob/master/src/filter/mod.rs
+///
+/// Parse a logging specification string (e.g: "crate1,crate2::mod3,crate3::x=error")
+/// and return a vector with log directives.
+fn parse_args(filter: &mut Vec<Directive, U8>, spec: &str) {
+    let mut parts = spec.split('/');
+    let mods = parts.next();
+    if parts.next().is_some() {
+        sprintln!(
+            "warning: invalid logging spec '{}', \
+             ignoring it (too many '/'s)",
+            spec
+        );
+        return;
+    }
+    mods.map(|m| {
+        for s in m.split(',') {
+            if s.len() == 0 {
+                continue;
+            }
+            let mut parts = s.split('=');
+            let (log_level, name) =
+                match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
+                    (Some(part0), None, None) => {
+                        // if the single argument is a log-level string or number,
+                        // treat that as a global fallback
+                        match part0.parse() {
+                            Ok(num) => (num, None),
+                            Err(_) => (LevelFilter::max(), Some(part0)),
+                        }
+                    }
+                    (Some(part0), Some(""), None) => (LevelFilter::max(), Some(part0)),
+                    (Some(part0), Some(part1), None) => match part1.parse() {
+                        Ok(num) => (num, Some(part0)),
+                        _ => {
+                            sprintln!(
+                                "warning: invalid logging spec '{}', \
+                                 ignoring it",
+                                part1
+                            );
+                            continue;
+                        }
+                    },
+                    _ => {
+                        sprintln!(
+                            "warning: invalid logging spec '{}', \
+                             ignoring it",
+                            s
+                        );
+                        continue;
+                    }
+                };
+
+            match filter.push(Directive {
+                name: match name {
+                    None => None,
+                    Some(name) => Some(String::from(name)),
+                },
+                level: log_level,
+            }) {
+                Ok(_) => {}
+                Err(e) => {
+                    sprintln!("Unable to add new filter {:?}", e);
+                }
+            }
+        }
+    });
+}
+
+// Check whether a level and target are enabled by the set of directives.
+fn enabled(directives: &[Directive], level: Level, target: &str) -> bool {
+    // Search for the longest match, the vector is assumed to be pre-sorted.
+    for directive in directives.iter().rev() {
+        match directive.name {
+            Some(ref name) if !target.starts_with(&**name) => {}
+            Some(..) | None => return level <= directive.level,
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod test {
+    use heapless::consts::*;
+    use heapless::String;
+    use heapless::Vec as VEC;
+    use log::{Level, LevelFilter};
+
+    use super::{enabled, parse_args, Directive};
+
+    #[test]
+    fn filter_info() {
+        let mut filter: Vec<Directive> = Vec::new();
+        filter.push(Directive {
+            name: None,
+            level: LevelFilter::Info,
+        });
+        assert!(enabled(&filter, Level::Info, "crate1"));
+        assert!(!enabled(&filter, Level::Debug, "crate1"));
+    }
+
+    #[test]
+    fn filter_beginning_longest_match() {
+        let mut filter: Vec<Directive> = Vec::new();
+        filter.push(Directive {
+            name: Some(String::from("crate2")),
+            level: LevelFilter::Info,
+        });
+        filter.push(Directive {
+            name: Some(String::from("crate2::mod")),
+            level: LevelFilter::Debug,
+        });
+        filter.push(Directive {
+            name: Some(String::from("crate1::mod1")),
+            level: LevelFilter::Warn,
+        });
+        assert!(enabled(&filter, Level::Debug, "crate2::mod1"));
+        assert!(!enabled(&filter, Level::Debug, "crate2"));
+    }
+
+    #[test]
+    fn parse_default() {
+        let mut filter: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut filter, "info,crate1::mod1=warn");
+        assert!(enabled(&filter, Level::Warn, "crate1::mod1"));
+        assert!(enabled(&filter, Level::Info, "crate2::mod2"));
+    }
+
+    #[test]
+    fn match_full_path() {
+        let logger = vec![
+            Directive {
+                name: Some(String::from("crate2")),
+                level: LevelFilter::Info,
+            },
+            Directive {
+                name: Some(String::from("crate1::mod1")),
+                level: LevelFilter::Warn,
+            },
+        ];
+        assert!(enabled(&logger, Level::Warn, "crate1::mod1"));
+        assert!(!enabled(&logger, Level::Info, "crate1::mod1"));
+        assert!(enabled(&logger, Level::Info, "crate2"));
+        assert!(!enabled(&logger, Level::Debug, "crate2"));
+    }
+
+    #[test]
+    fn no_match() {
+        let logger = vec![
+            Directive {
+                name: Some(String::from("crate2")),
+                level: LevelFilter::Info,
+            },
+            Directive {
+                name: Some(String::from("crate1::mod1")),
+                level: LevelFilter::Warn,
+            },
+        ];
+        assert!(!enabled(&logger, Level::Warn, "crate3"));
+    }
+
+    #[test]
+    fn match_beginning() {
+        let logger = vec![
+            Directive {
+                name: Some(String::from("crate2")),
+                level: LevelFilter::Info,
+            },
+            Directive {
+                name: Some(String::from("crate1::mod1")),
+                level: LevelFilter::Warn,
+            },
+        ];
+        assert!(enabled(&logger, Level::Info, "crate2::mod1"));
+    }
+
+    #[test]
+    fn match_beginning_longest_match() {
+        let logger = vec![
+            Directive {
+                name: Some(String::from("crate2")),
+                level: LevelFilter::Info,
+            },
+            Directive {
+                name: Some(String::from("crate2::mod")),
+                level: LevelFilter::Debug,
+            },
+            Directive {
+                name: Some(String::from("crate1::mod1")),
+                level: LevelFilter::Warn,
+            },
+        ];
+        assert!(enabled(&logger, Level::Debug, "crate2::mod1"));
+        assert!(!enabled(&logger, Level::Debug, "crate2"));
+    }
+
+    #[test]
+    fn match_default() {
+        let logger = vec![
+            Directive {
+                name: None,
+                level: LevelFilter::Info,
+            },
+            Directive {
+                name: Some(String::from("crate1::mod1")),
+                level: LevelFilter::Warn,
+            },
+        ];
+        assert!(enabled(&logger, Level::Warn, "crate1::mod1"));
+        assert!(enabled(&logger, Level::Info, "crate2::mod2"));
+    }
+
+    #[test]
+    fn zero_level() {
+        let logger = vec![
+            Directive {
+                name: None,
+                level: LevelFilter::Info,
+            },
+            Directive {
+                name: Some(String::from("crate1::mod1")),
+                level: LevelFilter::Off,
+            },
+        ];
+        assert!(!enabled(&logger, Level::Error, "crate1::mod1"));
+        assert!(enabled(&logger, Level::Info, "crate2::mod2"));
+    }
+
+    #[test]
+    fn parse_args_valid() {
+        let mut dirs: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut dirs, "crate1::mod1=error,crate1::mod2,crate2=debug");
+
+        assert_eq!(dirs.len(), 3);
+        assert_eq!(dirs[0].name, Some(String::from("crate1::mod1")));
+        assert_eq!(dirs[0].level, LevelFilter::Error);
+
+        assert_eq!(dirs[1].name, Some(String::from("crate1::mod2")));
+        assert_eq!(dirs[1].level, LevelFilter::max());
+
+        assert_eq!(dirs[2].name, Some(String::from("crate2")));
+        assert_eq!(dirs[2].level, LevelFilter::Debug);
+    }
+
+    #[test]
+    fn parse_spec_invalid_crate() {
+        // test parse_spec with multiple = in specification
+        let mut dirs: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut dirs, "crate1::mod1=warn=info,crate2=debug");
+
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some(String::from("crate2")));
+        assert_eq!(dirs[0].level, LevelFilter::Debug);
+    }
+
+    #[test]
+    fn parse_spec_invalid_level() {
+        // test parse_spec with 'noNumber' as log level
+        let mut dirs: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut dirs, "crate1::mod1=noNumber,crate2=debug");
+
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some(String::from("crate2")));
+        assert_eq!(dirs[0].level, LevelFilter::Debug);
+    }
+
+    #[test]
+    fn parse_spec_string_level() {
+        // test parse_spec with 'warn' as log level
+        let mut dirs: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut dirs, "crate1::mod1=wrong,crate2=warn");
+
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some(String::from("crate2")));
+        assert_eq!(dirs[0].level, LevelFilter::Warn);
+    }
+
+    #[test]
+    fn parse_spec_empty_level() {
+        // test parse_spec with '' as log level\
+        let mut dirs: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut dirs, "crate1::mod1=wrong,crate2=");
+
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some(String::from("crate2")));
+        assert_eq!(dirs[0].level, LevelFilter::max());
+    }
+
+    #[test]
+    fn parse_spec_global() {
+        // test parse_spec with no crate
+        let mut dirs: VEC<Directive, U8> = VEC::new();
+        parse_args(&mut dirs, "warn,crate2=debug");
+
+        assert_eq!(dirs.len(), 2);
+        assert_eq!(dirs[0].name, None);
+        assert_eq!(dirs[0].level, LevelFilter::Warn);
+        assert_eq!(dirs[1].name, Some(String::from("crate2")));
+        assert_eq!(dirs[1].level, LevelFilter::Debug);
     }
 }
