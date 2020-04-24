@@ -1,6 +1,6 @@
 [package]
 name = "klogger"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ankit Bhardwaj <ankitb@cs.utah.edu>"]
 
 description = "Library for logging in kernel mode."
@@ -11,7 +11,7 @@ keywords = ["serial", "os", "amd64", "x86"]
 license = "MIT"
 
 [dependencies]
-x86 = "0.21"
+x86 = "0.32"
 log = "0.4"
 termcodes = "0.0.1"
 spin = "0.5.2"
