@@ -264,7 +264,7 @@ pub fn init(args: &str) -> Result<(), SetLoggerError> {
         let tsc_frequency_hz: Option<u64> = cpuid.get_tsc_info().and_then(|tinfo| {
             if tinfo.nominal_frequency() != 0 {
                 // If we have a crystal clock we can calculate the tsc frequency directly
-                Some(tinfo.tsc_frequency())
+                tinfo.tsc_frequency()
             } else if tinfo.numerator() != 0 && tinfo.denominator() != 0 {
                 // Skylake and Kabylake don't report the crystal clock frequency,
                 // so we approximate with CPU base frequency:
