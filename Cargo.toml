@@ -11,7 +11,7 @@ keywords = ["serial", "os", "amd64", "x86"]
 license = "MIT"
 
 [dependencies]
-x86 = "0.32"
+x86 = "0.37"
 log = "0.4"
 termcodes = "0.0.1"
 spin = "0.5.2"
