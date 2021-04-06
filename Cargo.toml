@@ -1,6 +1,6 @@
 [package]
 name = "klogger"
-version = "0.0.6"
+version = "0.0.7"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ankit Bhardwaj <ankitb@cs.utah.edu>"]
 
 description = "Library for logging in kernel mode."
@@ -8,7 +8,7 @@ repository = "https://github.com/gz/rust-klogger"
 
 readme = "README.md"
 keywords = ["serial", "os", "amd64", "x86"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 x86 = "0.37"
