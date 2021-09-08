@@ -246,8 +246,9 @@ impl fmt::Write for WriterNoDrop {
     }
 }
 
-pub fn init(args: &str) -> Result<(), SetLoggerError> {
+pub fn init(args: &str, output_indicator: u16) -> Result<(), SetLoggerError> {
     let cpuid = x86::cpuid::CpuId::new();
+    arch::set_output(output_indicator);
 
     unsafe {
         LOGGER.has_tsc = cpuid
