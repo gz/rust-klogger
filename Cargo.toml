@@ -1,6 +1,6 @@
 [package]
 name = "klogger"
-version = "0.0.10"
+version = "0.0.11"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ankit Bhardwaj <ankitb@cs.utah.edu>"]
 
 description = "Library for logging in kernel mode."
