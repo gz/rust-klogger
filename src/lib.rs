@@ -29,7 +29,6 @@ mod arch;
 #[path = "arch/unix.rs"]
 mod arch;
 
-use heapless::consts::*;
 use heapless::{String, Vec};
 use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
 use termcodes::color; // type level integer used to specify capacity
@@ -48,7 +47,7 @@ pub static SERIAL_LINE_MUTEX: spin::Mutex<bool> = spin::Mutex::new(false);
 
 #[derive(Debug)]
 pub struct Directive {
-    name: Option<String<U16>>,
+    name: Option<String<64>>,
     level: LevelFilter,
 }
 
@@ -73,7 +72,7 @@ struct KLogger {
     /// Filter(s) used by Klogger.
     ///
     /// Use module name or log level or both for filtering.
-    filter: Vec<Directive, U8>,
+    filter: Vec<Directive, 8>,
 }
 
 enum ElapsedTime {
@@ -174,7 +173,7 @@ static mut LOGGER: KLogger = KLogger {
     has_invariant_tsc: false,
     tsc_start: 0,
     tsc_frequency: None,
-    filter: Vec(heapless::i::Vec::new()),
+    filter: Vec::new(),
 };
 
 /// A writer for the serial line. It holds a lock so
@@ -315,7 +314,7 @@ pub fn putchar(c: char) {
 ///
 /// Parse a logging specification string (e.g: "crate1,crate2::mod3,crate3::x=error")
 /// and return a vector with log directives.
-fn parse_args(filter: &mut Vec<Directive, U8>, spec: &str) {
+fn parse_args(filter: &mut Vec<Directive, 8>, spec: &str) {
     let mut parts = spec.split('/');
     let mods = parts.next();
     if parts.next().is_some() {
@@ -394,7 +393,6 @@ fn enabled(directives: &[Directive], level: Level, target: &str) -> bool {
 
 #[cfg(test)]
 mod test {
-    use heapless::consts::*;
     use heapless::String;
     use heapless::Vec as VEC;
     use log::{Level, LevelFilter};
@@ -433,7 +431,7 @@ mod test {
 
     #[test]
     fn parse_default() {
-        let mut filter: VEC<Directive, U8> = VEC::new();
+        let mut filter: VEC<Directive, 8> = VEC::new();
         parse_args(&mut filter, "info,crate1::mod1=warn");
         assert!(enabled(&filter, Level::Warn, "crate1::mod1"));
         assert!(enabled(&filter, Level::Info, "crate2::mod2"));
@@ -541,7 +539,7 @@ mod test {
 
     #[test]
     fn parse_args_valid() {
-        let mut dirs: VEC<Directive, U8> = VEC::new();
+        let mut dirs: VEC<Directive, 8> = VEC::new();
         parse_args(&mut dirs, "crate1::mod1=error,crate1::mod2,crate2=debug");
 
         assert_eq!(dirs.len(), 3);
@@ -558,7 +556,7 @@ mod test {
     #[test]
     fn parse_spec_invalid_crate() {
         // test parse_spec with multiple = in specification
-        let mut dirs: VEC<Directive, U8> = VEC::new();
+        let mut dirs: VEC<Directive, 8> = VEC::new();
         parse_args(&mut dirs, "crate1::mod1=warn=info,crate2=debug");
 
         assert_eq!(dirs.len(), 1);
@@ -569,7 +567,7 @@ mod test {
     #[test]
     fn parse_spec_invalid_level() {
         // test parse_spec with 'noNumber' as log level
-        let mut dirs: VEC<Directive, U8> = VEC::new();
+        let mut dirs: VEC<Directive, 8> = VEC::new();
         parse_args(&mut dirs, "crate1::mod1=noNumber,crate2=debug");
 
         assert_eq!(dirs.len(), 1);
@@ -580,7 +578,7 @@ mod test {
     #[test]
     fn parse_spec_string_level() {
         // test parse_spec with 'warn' as log level
-        let mut dirs: VEC<Directive, U8> = VEC::new();
+        let mut dirs: VEC<Directive, 8> = VEC::new();
         parse_args(&mut dirs, "crate1::mod1=wrong,crate2=warn");
 
         assert_eq!(dirs.len(), 1);
@@ -591,7 +589,7 @@ mod test {
     #[test]
     fn parse_spec_empty_level() {
         // test parse_spec with '' as log level\
-        let mut dirs: VEC<Directive, U8> = VEC::new();
+        let mut dirs: VEC<Directive, 8> = VEC::new();
         parse_args(&mut dirs, "crate1::mod1=wrong,crate2=");
 
         assert_eq!(dirs.len(), 1);
@@ -602,7 +600,7 @@ mod test {
     #[test]
     fn parse_spec_global() {
         // test parse_spec with no crate
-        let mut dirs: VEC<Directive, U8> = VEC::new();
+        let mut dirs: VEC<Directive, 8> = VEC::new();
         parse_args(&mut dirs, "warn,crate2=debug");
 
         assert_eq!(dirs.len(), 2);
