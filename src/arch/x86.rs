@@ -3,7 +3,7 @@ use core::sync::atomic::Ordering;
 
 extern crate x86;
 
-use x86::io;
+use self::x86::io;
 
 /// One Mhz is that many Hz.
 const MHZ_TO_HZ: u64 = 1000 * 1000;
