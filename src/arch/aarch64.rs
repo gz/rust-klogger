@@ -15,11 +15,11 @@ pub fn get_timestamp() -> u64 {
 }
 
 pub fn has_tsc() -> bool {
-    false;
+    false
 }
 
 pub fn has_invariant_tsc() -> bool {
-    false;
+    false
 }
 
 pub fn get_tsc_frequency_hz() -> Option<u64> {
