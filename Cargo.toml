@@ -1,21 +1,29 @@
 [package]
 name = "klogger"
 version = "0.0.14"
-authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ankit Bhardwaj <ankitb@cs.utah.edu>"]
+authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ankit Bhardwaj <ankitb@cs.utah.edu>", "Reto Achermann <achreto@gmail.com>"]
 
 description = "Library for logging in kernel mode."
 repository = "https://github.com/gz/rust-klogger"
 
 readme = "README.md"
-keywords = ["serial", "os", "amd64", "x86"]
+keywords = ["serial", "os", "amd64", "x86", "armv8"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-x86 = { version = "0.51", features = ["unstable"] }
 log = "0.4"
 termcodes = "0.0.1"
 spin = "0.5.2"
 heapless = "0.7.14"
+
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86 = { version = "0.51", features = ["unstable"] }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+armv8 = { git = "https://github.com/achreto/rust-armv8" }
+
+
 
 [features]
 use_ioports = [] # Always use ioports, even when compiling for a UNIX architecture (used by kvmtests)
