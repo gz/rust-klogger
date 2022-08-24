@@ -1,5 +1,3 @@
-use crate::{KHZ_TO_HZ, MHZ_TO_HZ};
-
 /// Write a string to the output channel.
 pub unsafe fn puts(s: &str) {}
 
