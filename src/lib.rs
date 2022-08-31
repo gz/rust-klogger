@@ -15,15 +15,19 @@ pub mod macros;
 extern crate log;
 extern crate termcodes;
 
-#[cfg(target_arch = "x86_64")]
-extern crate x86;
-
 #[cfg(any(
     feature = "use_ioports",
     all(target_arch = "x86_64", target_os = "none")
 ))]
 #[path = "arch/x86.rs"]
 mod arch;
+
+#[cfg(all(target_arch = "aarch64", target_os = "none"))]
+#[path = "arch/aarch64.rs"]
+mod arch;
+
+#[cfg(all(target_arch = "aarch64", feature = "use_ioports"))]
+compile_error!("ioports are not supported on aarch64");
 
 #[cfg(all(not(feature = "use_ioports"), target_family = "unix"))]
 #[path = "arch/unix.rs"]
@@ -32,15 +36,6 @@ mod arch;
 use heapless::{String, Vec};
 use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
 use termcodes::color; // type level integer used to specify capacity
-
-/// One Mhz is that many Hz.
-const MHZ_TO_HZ: u64 = 1000 * 1000;
-
-/// One Khz is that many Hz.
-const KHZ_TO_HZ: u64 = 1000;
-
-/// One sec has that many ns.
-const _NS_PER_SEC: u64 = 1_000_000_000u64;
 
 /// Global lock to protect serial line from concurrent printing.
 pub static SERIAL_LINE_MUTEX: spin::Mutex<bool> = spin::Mutex::new(false);
@@ -96,7 +91,7 @@ impl KLogger {
     /// Time in nano seconds since KLogger init.
     fn elapsed(&self) -> ElapsedTime {
         if self.has_tsc {
-            let cur = unsafe { x86::time::rdtsc() };
+            let cur = arch::get_timestamp();
 
             if self.has_invariant_tsc && self.tsc_frequency.is_some() {
                 let elapsed_cycles = cur - self.tsc_start;
@@ -246,44 +241,20 @@ impl fmt::Write for WriterNoDrop {
 }
 
 pub fn init(args: &str, output_indicator: u16) -> Result<(), SetLoggerError> {
-    let cpuid = x86::cpuid::CpuId::new();
     arch::set_output(output_indicator);
 
     unsafe {
-        LOGGER.has_tsc = cpuid
-            .get_feature_info()
-            .map_or(false, |finfo| finfo.has_tsc());
-        LOGGER.has_invariant_tsc = cpuid
-            .get_advanced_power_mgmt_info()
-            .map_or(false, |efinfo| efinfo.has_invariant_tsc());
+        LOGGER.has_tsc = arch::has_tsc();
+        LOGGER.has_invariant_tsc = arch::has_invariant_tsc();
 
         if LOGGER.has_tsc {
-            LOGGER.tsc_start = x86::time::rdtsc();
+            LOGGER.tsc_start = arch::get_timestamp();
         }
 
-        let tsc_frequency_hz: Option<u64> = cpuid.get_tsc_info().and_then(|tinfo| {
-            if tinfo.nominal_frequency() != 0 {
-                // If we have a crystal clock we can calculate the tsc frequency directly
-                tinfo.tsc_frequency()
-            } else if tinfo.numerator() != 0 && tinfo.denominator() != 0 {
-                // Skylake and Kabylake don't report the crystal clock frequency,
-                // so we approximate with CPU base frequency:
-                cpuid.get_processor_frequency_info().map(|pinfo| {
-                    let cpu_base_freq_hz = pinfo.processor_base_frequency() as u64 * MHZ_TO_HZ;
-                    let crystal_hz =
-                        cpu_base_freq_hz * tinfo.denominator() as u64 / tinfo.numerator() as u64;
-                    crystal_hz * tinfo.numerator() as u64 / tinfo.denominator() as u64
-                })
-            } else {
-                // We couldn't figure out the TSC frequency
-                None
-            }
-        });
+        let tsc_frequency_hz: Option<u64> = arch::get_tsc_frequency_hz();
 
         // Check if we run in a VM and the hypervisor can give us the TSC frequency
-        let vmm_tsc_frequency_hz: Option<u64> = cpuid
-            .get_hypervisor_info()
-            .and_then(|hv| hv.tsc_frequency().map(|tsc_khz| tsc_khz as u64 * KHZ_TO_HZ));
+        let vmm_tsc_frequency_hz: Option<u64> = arch::get_vmm_tsc_frequency_hz();
 
         if tsc_frequency_hz.is_some() {
             LOGGER.tsc_frequency = tsc_frequency_hz;
