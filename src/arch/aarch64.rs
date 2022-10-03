@@ -1,10 +1,21 @@
-/// Write a string to the output channel.
-pub unsafe fn puts(s: &str) {}
+use core::fmt::Write;
 
-pub unsafe fn putc(c: char) {}
+/// Write a string to the output channel.
+pub unsafe fn puts(s: &str) {
+    let mut uart = pl011_qemu::PL011::new(pl011_qemu::UART1::steal());
+    uart.write_str(s).unwrap();
+}
+
+pub unsafe fn putc(c: char) {
+    let mut uart = pl011_qemu::PL011::new(pl011_qemu::UART1::steal());
+    uart.write_char(c).unwrap();
+}
 
 /// Write a single byte to the output channel.
-unsafe fn putb(port: u16, b: u8) {}
+unsafe fn putb(port: u16, b: u8) {
+    let mut uart = pl011_qemu::PL011::new(pl011_qemu::UART1::steal());
+    uart.write_byte(b);
+}
 
 pub fn set_output(port: u16) {}
 

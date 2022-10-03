@@ -5,6 +5,7 @@
 #[cfg(not(target_os = "none"))]
 extern crate core;
 extern crate heapless;
+extern crate pl011_qemu;
 
 use core::fmt;
 use core::ops;
