@@ -5,8 +5,10 @@
 #[cfg(not(target_os = "none"))]
 extern crate core;
 extern crate heapless;
+#[cfg(all(target_arch = "aarch64", target_os = "none"))]
 extern crate pl011_qemu;
 
+use core::convert::TryInto;
 use core::fmt;
 use core::ops;
 
@@ -241,8 +243,8 @@ impl fmt::Write for WriterNoDrop {
     }
 }
 
-pub fn init(args: &str, output_indicator: u16) -> Result<(), SetLoggerError> {
-    arch::set_output(output_indicator);
+pub fn init(args: &str, output_indicator: u64) -> Result<(), SetLoggerError> {
+    arch::set_output(output_indicator.try_into().unwrap());
 
     unsafe {
         LOGGER.has_tsc = arch::has_tsc();
