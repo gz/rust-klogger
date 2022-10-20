@@ -21,8 +21,8 @@ heapless = "0.7.14"
 x86 = { version = "0.52", features = ["unstable"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-armv8 = { git = "https://github.com/achreto/rust-armv8" }
-pl011_qemu = { git = "https://github.com/gz/pl011_qemu.git" }
+armv8 = "0.0.1"
+pl011_drv = "0.1.0"
 
 [features]
 use_ioports = [] # Always use ioports, even when compiling for a UNIX architecture (used by kvmtests)
