@@ -1,6 +1,6 @@
 [package]
 name = "klogger"
-version = "0.0.15"
+version = "0.0.16"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ankit Bhardwaj <ankitb@cs.utah.edu>", "Reto Achermann <achreto@gmail.com>"]
 
 description = "Library for logging in kernel mode."
@@ -18,7 +18,7 @@ heapless = "0.7.14"
 
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-x86 = { version = "0.51", features = ["unstable"] }
+x86 = { version = "0.52", features = ["unstable"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 armv8 = { git = "https://github.com/achreto/rust-armv8" }
